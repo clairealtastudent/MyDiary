@@ -328,8 +328,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty)
                     return 'Please enter your password';
-                  if (value.length < 6)
+                  if (value.length < 6) {
                     return 'Password must be at least 6 characters';
+                  }
                   return null;
                 },
               ),
@@ -387,7 +388,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
 // SECTION 5: HOME SCREEN & NAVIGATION MENU
 // ============================================================================
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final TaskItem? initialTask;
+
+  const HomeScreen({super.key, this.initialTask});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -447,7 +450,14 @@ class _HomeScreenState extends State<HomeScreen> {
               }),
               
               const SizedBox(height: 4),
-              _buildDrawerItem(Icons.add_circle_outline, 'New Task', () {}),
+              _buildDrawerItem(Icons.add_circle_outline, 'New Task', () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const NewTaskScreen()),
+                );
+              }),
+              
               const SizedBox(height: 4),
               _buildDrawerItem(
                 Icons.settings_outlined,
@@ -2145,6 +2155,406 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+class TaskItem {
+  final String title;
+  final String category;
+  final DateTime dueDate;
+  final TimeOfDay dueTime;
+  final String priority;
+  final String notes;
+
+  TaskItem({
+    required this.title,
+    required this.category,
+    required this.dueDate,
+    required this.dueTime,
+    required this.priority,
+    required this.notes,
+  });
+}
+
+// ============
+// HOME SCREEN 
+// ============
+// ================
+// NEW TASK SCREEN 
+// ================
+class NewTaskScreen extends StatefulWidget {
+  const NewTaskScreen({super.key});
+
+  @override
+  State<NewTaskScreen> createState() => _NewTaskScreenState();
+}
+
+class _NewTaskScreenState extends State<NewTaskScreen> {
+  int selectedCategory = 0;
+  String selectedPriority = 'Medium';
+  
+  DateTime selectedDate = DateTime.now();
+  TimeOfDay selectedTime = const TimeOfDay(hour: 16, minute: 0);
+
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController notesController = TextEditingController();
+
+  Future<void> _pickDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: primaryPurple),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
+  }
+
+  Future<void> _pickTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: selectedTime,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: primaryPurple),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        selectedTime = picked;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final List<String> weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    String formattedDate = "${weekdays[selectedDate.weekday - 1]}, ${months[selectedDate.month - 1]} ${selectedDate.day}";
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: const Text(
+          'NEW TASK',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            color: textPurple,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_none, color: textPurple),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationScreen(entries: []),
+                ),
+              );
+            },
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Container(color: dividerPurple, height: 1.0),
+        ),
+      ),
+      drawer: Drawer(
+        backgroundColor: bgLightPurple,
+        elevation: 0,
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 30),
+              const Center(
+                child: Text(
+                  'MY DIARY',
+                  style: TextStyle(
+                    fontFamily: 'sans-serif-condensed',
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white,
+                    decorationThickness: 2,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+              _buildDrawerItem(Icons.folder_outlined, 'Schedule', primaryPurple, () {}),
+              const SizedBox(height: 8),
+              _buildDrawerItem(Icons.add_circle_outline, 'New Task', primaryPurple, () {
+                Navigator.pop(context); // Tutup drawer
+              }),
+              const SizedBox(height: 8),
+              _buildDrawerItem(Icons.settings_outlined, 'Security Setting', primaryPurple, () {}),
+              const SizedBox(height: 8),
+              _buildDrawerItem(Icons.alarm, 'Alarm', primaryPurple, () {}),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.only(left: 24.0, bottom: 20.0),
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: dividerPurple,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Task Title', style: TextStyle(fontSize: 12, color: textPurple, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., Biology Test',
+                        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Category', style: TextStyle(fontSize: 12, color: textPurple, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 45,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: List.generate(5, (index) {
+                          bool isSelected = selectedCategory == index;
+                          List<IconData> icons = [
+                            Icons.security,
+                            Icons.book,
+                            Icons.shopping_bag,
+                            Icons.person,
+                            Icons.flight,
+                          ];
+                          return GestureDetector(
+                            onTap: () => setState(() => selectedCategory = index),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isSelected ? primaryPurple : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(icons[index], color: isSelected ? Colors.white : textPurple, size: 22),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Due Date', style: TextStyle(fontSize: 12, color: textPurple, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              GestureDetector(
+                                onTap: () => _pickDate(context),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(formattedDate, style: const TextStyle(fontSize: 13, color: textPurple)),
+                                      const Icon(Icons.calendar_today_outlined, size: 16, color: textPurple),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Time', style: TextStyle(fontSize: 12, color: textPurple, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              GestureDetector(
+                                onTap: () => _pickTime(context),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(selectedTime.format(context), style: const TextStyle(fontSize: 13, color: textPurple)),
+                                      const Icon(Icons.access_time, size: 16, color: textPurple),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Priority', style: TextStyle(fontSize: 12, color: textPurple, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: ['Low', 'Medium', 'High'].map((priority) {
+                        bool isSelected = selectedPriority == priority;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => selectedPriority = priority),
+                            child: Container(
+                              margin: EdgeInsets.only(right: priority != 'High' ? 8 : 0),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSelected ? primaryPurple : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                priority,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : textPurple,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Details/Notes', style: TextStyle(fontSize: 12, color: textPurple, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Writes Here',
+                        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.all(16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Builder(
+                    builder: (BuildContext innerContext) {
+                      return IconButton(
+                        icon: const Icon(Icons.menu, color: textPurple, size: 28),
+                        onPressed: () {
+                          Scaffold.of(innerContext).openDrawer();
+                        },
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.bookmark_border, color: textPurple, size: 28),
+                    onPressed: () {
+                      final newTask = TaskItem(
+                        title: titleController.text.isEmpty ? 'Untitled Task' : titleController.text,
+                        category: 'Category $selectedCategory',
+                        dueDate: selectedDate,
+                        dueTime: selectedTime,
+                        priority: selectedPriority,
+                        notes: notesController.text,
+                      );
+                      // Kembali ke HomeScreen dan membawa data newTask
+                      Navigator.pop(context, newTask);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(IconData icon, String title, Color bgColor, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+        decoration: BoxDecoration(color: bgColor),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 26),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
