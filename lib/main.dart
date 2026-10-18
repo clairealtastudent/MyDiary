@@ -436,16 +436,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-             const SizedBox(height: 40),
-              
+              const SizedBox(height: 40),
+
               _buildDrawerItem(Icons.folder_outlined, 'Schedule', () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ScheduleScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ScheduleScreen(),
+                  ),
                 );
               }),
-              
+
               const SizedBox(height: 4),
               _buildDrawerItem(Icons.add_circle_outline, 'New Task', () {}),
               const SizedBox(height: 4),
@@ -1473,7 +1475,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-  
+
     activities = [
       ScheduleItem(
         title: 'Group Project',
