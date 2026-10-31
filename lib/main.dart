@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyDiaryApp());
@@ -17,6 +19,49 @@ class DiaryEntry {
   final DateTime date;
 
   DiaryEntry({required this.title, required this.content, required this.date});
+}
+
+//NEW: UPDATED DATA MODEL FOR LOCAL STORAGE
+class TaskItem {
+  final String title;
+  final String category;
+  final DateTime dueDate;
+  final TimeOfDay dueTime;
+  final String priority;
+  final String notes;
+
+  TaskItem({
+    required this.title,
+    required this.category,
+    required this.dueDate,
+    required this.dueTime,
+    required this.priority,
+    required this.notes,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'category': category,
+        'dueDate': dueDate.toIso8601String(),
+        'dueTime': '${dueTime.hour}:${dueTime.minute}',
+        'priority': priority,
+        'notes': notes,
+      };
+
+  factory TaskItem.fromJson(Map<String, dynamic> json) {
+    final timeParts = json['dueTime'].toString().split(':');
+    return TaskItem(
+      title: json['title'],
+      category: json['category'],
+      dueDate: DateTime.parse(json['dueDate']),
+      dueTime: TimeOfDay(
+        hour: int.parse(timeParts[0]),
+        minute: int.parse(timeParts[1]),
+      ),
+      priority: json['priority'],
+      notes: json['notes'],
+    );
+  }
 }
 
 // ============================================================================
@@ -98,31 +143,23 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const UnlockScreen(),
+                    MaterialPageRoute(builder: (context) => const UnlockScreen(),
                     ),
                   );
                 },
-                child: const Text(
-                  'Open',
-                  style: TextStyle(color: textPurple, fontSize: 18),
-                ),
+                child: const Text('Open', style: TextStyle(color: textPurple, fontSize: 18)),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: darkButton,
                   minimumSize: const Size(200, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
                   );
                 },
                 child: const Text(
@@ -251,13 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
 }
 
 // ============================================================================
@@ -314,16 +344,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     borderSide: BorderSide.none,
                   ),
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _isObscured ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isObscured = !_isObscured;
-                      });
-                    },
-                  ),
+                    icon: Icon(_isObscured ? Icons.visibility_off : Icons.visibility, color: Colors.white),
+                    onPressed: () => setState(() => _isObscured = !_isObscured),
+                      ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty)
@@ -376,12 +399,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
       ),
     );
   }
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    super.dispose();
-  }
 }
 
 // ============================================================================
@@ -389,7 +406,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
 // ============================================================================
 class HomeScreen extends StatefulWidget {
   final TaskItem? initialTask;
-
   const HomeScreen({super.key, this.initialTask});
 
   @override
@@ -400,18 +416,25 @@ class _HomeScreenState extends State<HomeScreen> {
   //diaries saved starts completely empty
   final List<DiaryEntry> _savedEntries = [];
 
+  // new: store username retrieved from SharedPreferences
+  String _username = 'User';
+
   @override
   void initState() {
     super.initState();
-    print('DEBUG LOG: HomeScreen initialized via initState()');
-    print('DEBUG LOG: Initial diary entries count: ${_savedEntries.length}');
+    _loadUsername();
+  }
+
+  //new: load username for greeting the user
+  Future<void> _loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _username = prefs.getString('username') ?? 'User';
+    });
   }
 
   void _addNewEntry(DiaryEntry entry) {
-    setState(() {
-      _savedEntries.add(entry);
-    });
-    print('DEBUG LOG: New entry added! Total entries: ${_savedEntries.length}');
+    setState(() => _savedEntries.add(entry));
   }
 
   @override
@@ -440,7 +463,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-
               _buildDrawerItem(Icons.folder_outlined, 'Schedule', () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -534,9 +556,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          AccountSettingScreen(entries: _savedEntries),
-                    ),
-                  );
+                          AccountSettingScreen(entries: _savedEntries)),
+                  ).then((_) => _loadUsername()); //new: reload username after returning from settings
                 },
               ),
             ),
@@ -553,9 +574,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Hello [User],',
-                style: TextStyle(
+              //new: greeting the user with their username
+              Text(
+                'Hello $_username,',
+                style: const TextStyle(
                   fontFamily: 'sans-serif-condensed',
                   color: textPurple,
                   fontSize: 28,
@@ -630,9 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 60,
             child: IconButton(
               icon: const Icon(Icons.menu, color: textPurple, size: 28),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           );
         },
@@ -674,8 +694,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 PreferredSizeWidget _buildSharedAppBar(
   BuildContext context,
-  List<DiaryEntry> entries,
-) {
+  List<DiaryEntry> entries) {
   return AppBar(
     title: const Padding(
       padding: EdgeInsets.only(left: 4.0),
@@ -737,7 +756,6 @@ PreferredSizeWidget _buildSharedAppBar(
 // LAYAR NOTIFIKASI
 class NotificationScreen extends StatelessWidget {
   final List<DiaryEntry> entries;
-
   const NotificationScreen({super.key, required this.entries});
 
   @override
@@ -775,7 +793,6 @@ class NotificationScreen extends StatelessWidget {
 // ============================================================================
 class WriteDiaryScreen extends StatefulWidget {
   final List<DiaryEntry> entries; // Added entries list
-
   const WriteDiaryScreen({super.key, required this.entries});
 
   @override
@@ -1212,7 +1229,6 @@ class DiarySavedScreen extends StatelessWidget {
 // LAYAR DAFTAR CATATAN
 class SavedEntriesScreen extends StatelessWidget {
   final List<DiaryEntry> entries;
-
   const SavedEntriesScreen({super.key, required this.entries});
 
   @override
@@ -1282,17 +1298,76 @@ class SavedEntriesScreen extends StatelessWidget {
   }
 }
 
-// LAYAR PENGATURAN AKUN
-class AccountSettingScreen extends StatelessWidget {
+//================================================================
+// NEW: LAYAR PENGATURAN AKUN (updated for shared prefs)
+//================================================================
+class AccountSettingScreen extends StatefulWidget {
   final List<DiaryEntry> entries;
-
   const AccountSettingScreen({super.key, required this.entries});
+
+  @override
+  State<AccountSettingScreen> createState() => _AccountSettingScreenState();
+}
+
+class _AccountSettingScreenState extends State<AccountSettingScreen> {
+  String _username = 'User';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsername();
+  }
+
+  Future<void> _loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _username = prefs.getString('username') ?? 'User';
+    });
+  }
+
+  Future<void> _updateUsername(String newName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('username', newName);
+    setState(() {
+      _username = newName;
+    });
+  }
+
+  void _showEditNameDialog() {
+    TextEditingController nameController = TextEditingController(text: _username);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Profile Name', style: TextStyle(color: textPurple)),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(hintText: 'Enter new name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primaryPurple),
+              onPressed: () {
+                _updateUsername(nameController.text);
+                Navigator.of(context).pop();
+              },
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: _buildSharedAppBar(context, entries),
+      appBar: _buildSharedAppBar(context, widget.entries),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -1304,82 +1379,52 @@ class AccountSettingScreen extends StatelessWidget {
                 child: Icon(Icons.person, size: 50, color: textPurple),
               ),
               const SizedBox(height: 8),
-              const Text(
-                '[User]',
-                style: TextStyle(
-                  color: textPurple,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _username,
+                    style: const TextStyle(color: textPurple, fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: textPurple, size: 20),
+                    onPressed: _showEditNameDialog, //trigger local storage save
+                  ),
+                ],
               ),
-              const Text(
-                '[Email]',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
+              const Text('[Email]', style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 24),
-              _buildBox(
-                'Account setting',
-                'Change your account & profile settings.\nUpdate information.',
-              ),
+              _buildBox('Account setting', 'Change your account & profile settings.\nUpdate information.'),
               const SizedBox(height: 12),
-              _buildBox(
-                'Help and support',
-                'Submit any questions you need answered.',
-              ),
+              _buildBox('Help and support', 'Submit any questions you need answered.'),
               const SizedBox(height: 12),
-              _buildBox(
-                'App setting',
-                'Themes, languages, privacy settings, notifications',
-              ),
+              _buildBox('App setting', 'Themes, languages, privacy settings, notifications'),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(
-                    child: _buildSmallBox(
-                      'Recently deleted',
-                      'All deleted diaries are temporarily kept here',
-                    ),
-                  ),
+                  Expanded(child: _buildSmallBox('Recently deleted', 'All deleted diaries are temporarily kept here')),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildSmallBox(
-                      'Log out',
-                      'Sign out of your account',
-                    ),
-                  ),
+                  Expanded(child: _buildSmallBox('Log out', 'Sign out of your account')),
                 ],
               ),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: Container(
+     bottomNavigationBar: Container(
         height: 50,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios,
-                color: textPurple,
-                size: 20,
-              ),
+              icon: const Icon(Icons.arrow_back_ios, color: textPurple, size: 20),
               onPressed: () => Navigator.pop(context),
             ),
             IconButton(
-              icon: const Icon(
-                Icons.article_outlined,
-                color: textPurple,
-                size: 24,
-              ),
+              icon: const Icon(Icons.article_outlined, color: textPurple, size: 24),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SavedEntriesScreen(entries: entries),
-                  ),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (context) => SavedEntriesScreen(entries: widget.entries)));
               },
             ),
           ],
@@ -1392,26 +1437,13 @@ class AccountSettingScreen extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: dividerPurple,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: dividerPurple, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: darkButton,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(title, style: const TextStyle(color: darkButton, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: const TextStyle(color: Colors.black54, fontSize: 12),
-          ),
+          Text(subtitle, style: const TextStyle(color: Colors.black54, fontSize: 12)),
         ],
       ),
     );
@@ -1440,15 +1472,16 @@ class AccountSettingScreen extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: const TextStyle(color: Colors.black54, fontSize: 9),
-          ),
+            style: const TextStyle(color: Colors.black54, fontSize: 9)),
         ],
       ),
     );
   }
 }
 
-// --- DATA MODEL ---
+// =============================================================================
+// SCHEDULE MAIN SCREENS
+// =============================================================================
 class ScheduleItem {
   final String title;
   final String timeInterval;
@@ -1465,18 +1498,14 @@ class ScheduleItem {
   });
 }
 
-// =============================================================================
-// 1. SCHEDULE MAIN SCREEN
-// =============================================================================
+
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
-
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  // Shared state list of schedule items
   List<ScheduleItem> activities = [];
   int selectedDay = 17;
   String selectedMonth = 'Sep';
@@ -1485,32 +1514,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-
     activities = [
       ScheduleItem(
         title: 'Group Project',
         timeInterval: '09:00 - 10:00 AM',
         date: 'Sep 17, 2026',
-        description: 'Lorem ipsum dolor sit amet',
+        description: 'Do assignments with group members',
       ),
       ScheduleItem(
         title: 'Break',
         timeInterval: '2:30 PM - 3:00 PM',
         date: 'Sep 17, 2026',
-        description: 'Lorem ipsum dolor sit amet',
+        description: 'Take a short break and eat something',
       ),
     ];
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   void _addNewSchedule(ScheduleItem newItem) {
-    setState(() {
-      activities.add(newItem);
-    });
+    setState(() => activities.add(newItem));
   }
 
   @override
@@ -1523,7 +1544,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // --- TOP HEADER ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
@@ -1575,7 +1595,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- CALENDAR CARD ---
+                    // calendar card
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1653,7 +1673,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Days of Week Labels
+                          // days of week labels
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children:
@@ -1676,7 +1696,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Simple Calendar Grid Sample (September 2026 view)
+                          // calendar example (September 2026 view)
                           _buildCalendarDaysGrid(primaryPurple),
                         ],
                       ),
@@ -1738,7 +1758,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       color: primaryPurple,
                     ),
                     onPressed: () async {
-                      // Requirement 3: Navigation & Data Passing with Navigator.push
                       final newSchedule = await Navigator.push<ScheduleItem>(
                         context,
                         MaterialPageRoute(
@@ -1761,7 +1780,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget _buildCalendarDaysGrid(Color primaryPurple) {
-    // Basic day array layout representing September
+    // basic day array layout representing September
     List<int?> days = [
       null,
       null,
@@ -1855,7 +1874,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Timeline indicator line + check icon
+          // timeline indicator line + check icon
           SizedBox(
             width: 40,
             child: Column(
@@ -1923,7 +1942,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 }
 
 // =============================================================================
-// 2. CREATE SCHEDULE SCREEN
+// CREATE SCHEDULE SCREEN
 // =============================================================================
 class CreateScheduleScreen extends StatefulWidget {
   const CreateScheduleScreen({super.key});
@@ -1933,7 +1952,6 @@ class CreateScheduleScreen extends StatefulWidget {
 }
 
 class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
-  // Requirement 2: Declaring TextEditingControllers
   late TextEditingController _titleController;
   late TextEditingController _dateController;
   late TextEditingController _timeController;
@@ -1942,7 +1960,6 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    // Requirement 2: Initializing controllers in initState()
     _titleController = TextEditingController();
     _dateController = TextEditingController(text: 'Saturday, Oct 17, 2026');
     _timeController = TextEditingController(text: '05:00 PM - 7:00 PM');
@@ -1951,7 +1968,6 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
 
   @override
   void dispose() {
-    // Requirement 2: Disposing controllers in dispose() to prevent memory leaks
     _titleController.dispose();
     _dateController.dispose();
     _timeController.dispose();
@@ -1976,7 +1992,6 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
           : _descriptionController.text.trim(),
     );
 
-    // Requirement 3: Returning data to previous screen with Navigator.pop
     Navigator.pop(context, newSchedule);
   }
 
@@ -2062,7 +2077,7 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
                     _buildInputField(
                       'Description',
                       _descriptionController,
-                      'e.g. Don\'t forget to bring bla bla bla bla bla',
+                      'e.g. Don\'t forget to bring snacks and drinks for everyone!',
                       maxLines: 4,
                     ),
                     const SizedBox(height: 28),
@@ -2095,7 +2110,6 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
               ),
             ),
 
-            // Bottom Back Navigation Row
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: const BoxDecoration(
@@ -2160,30 +2174,10 @@ class _CreateScheduleScreenState extends State<CreateScheduleScreen> {
     );
   }
 }
-class TaskItem {
-  final String title;
-  final String category;
-  final DateTime dueDate;
-  final TimeOfDay dueTime;
-  final String priority;
-  final String notes;
 
-  TaskItem({
-    required this.title,
-    required this.category,
-    required this.dueDate,
-    required this.dueTime,
-    required this.priority,
-    required this.notes,
-  });
-}
-
-// ============
-// HOME SCREEN 
-// ============
-// ================
-// NEW TASK SCREEN 
-// ================
+// ============================================================================
+// NEW: TASK SCREEN WITH LOCAL STORAGE (ADD & DELETE)
+// ============================================================================
 class NewTaskScreen extends StatefulWidget {
   const NewTaskScreen({super.key});
 
@@ -2194,54 +2188,63 @@ class NewTaskScreen extends StatefulWidget {
 class _NewTaskScreenState extends State<NewTaskScreen> {
   int selectedCategory = 0;
   String selectedPriority = 'Medium';
-  
   DateTime selectedDate = DateTime.now();
   TimeOfDay selectedTime = const TimeOfDay(hour: 16, minute: 0);
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
 
+  List<TaskItem> _savedTasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tasksString = prefs.getString('saved_tasks');
+    if (tasksString != null) {
+      final List<dynamic> decodedList = jsonDecode(tasksString);
+      setState(() {
+        _savedTasks = decodedList.map((item) => TaskItem.fromJson(item)).toList();
+      });
+    }
+  }
+
+  Future<void> _saveTasksToLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encodedList = jsonEncode(_savedTasks.map((task) => task.toJson()).toList());
+    await prefs.setString('saved_tasks', encodedList);
+  }
+
+  void _deleteTask(int index) {
+    setState(() {
+      _savedTasks.removeAt(index);
+    });
+    _saveTasksToLocal();
+  }
+     
   Future<void> _pickDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(primary: primaryPurple),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(data: ThemeData.light().copyWith(colorScheme: const ColorScheme.light(primary: primaryPurple)), child: child!),
     );
-    if (picked != null) {
-      setState(() {
-        selectedDate = picked;
-      });
-    }
-  }
+    if (picked != null) setState(() => selectedDate = picked);
+      }
 
-  Future<void> _pickTime(BuildContext context) async {
+    Future<void> _pickTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: selectedTime,
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(primary: primaryPurple),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(data: ThemeData.light().copyWith(colorScheme: const ColorScheme.light(primary: primaryPurple)), child: child!),
     );
-    if (picked != null) {
-      setState(() {
-        selectedTime = picked;
-      });
-    }
-  }
+    if (picked != null) setState(() => selectedTime = picked);
+  }  
 
   @override
   Widget build(BuildContext context) {
@@ -2517,26 +2520,61 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
                   IconButton(
                     icon: const Icon(Icons.bookmark_border, color: textPurple, size: 28),
                     onPressed: () {
+                      if (titleController.text.isNotEmpty) {
                       final newTask = TaskItem(
-                        title: titleController.text.isEmpty ? 'Untitled Task' : titleController.text,
+                        title: titleController.text,  
                         category: 'Category $selectedCategory',
                         dueDate: selectedDate,
                         dueTime: selectedTime,
                         priority: selectedPriority,
                         notes: notesController.text,
                       );
-                      // Kembali ke HomeScreen dan membawa data newTask
-                      Navigator.pop(context, newTask);
-                    },
-                  ),
-                ],
+                      setState(() {
+                        _savedTasks.add(newTask);
+                        titleController.clear();
+                        notesController.clear();
+                      });
+                      _saveTasksToLocal();
+                  }
+                },
+              ),
+            ],
+          ),
+
+        // NEW: DISPLAY LIST OF CONFIGURED TASKS (Week 15)
+              const SizedBox(height: 20),
+              const Text('My Configured Tasks', style: TextStyle(fontSize: 18, color: textPurple, fontWeight: FontWeight.bold)),
+              const Divider(color: dividerPurple, thickness: 2),
+              if (_savedTasks.isEmpty)
+                const Padding(padding: EdgeInsets.all(16.0), child: Text("No tasks created yet.", style: TextStyle(color: Colors.grey))),
+              
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _savedTasks.length,
+                itemBuilder: (context, index) {
+                  final task = _savedTasks[index];
+                  return Card(
+                    color: dividerPurple,
+                    elevation: 0,
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: ListTile(
+                      title: Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, color: textPurple)),
+                      subtitle: Text('${task.priority} Priority - ${task.dueDate.day}/${task.dueDate.month}/${task.dueDate.year}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _deleteTask(index),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
         ),
       ),
     );
-  }
+  }  
 
   Widget _buildDrawerItem(IconData icon, String title, Color bgColor, VoidCallback onTap) {
     return InkWell(
